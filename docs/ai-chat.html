@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>AI Necklace - Web Demo</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ヘッダー */
+        .header {
+            text-align: center;
+            padding: 20px 0;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 0.9rem;
+            color: #888;
+        }
+
+        /* ステータス */
+        .status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 15px;
+            font-size: 0.9rem;
+            color: #888;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #666;
+        }
+
+        .status-dot.connecting {
+            background: #ffc107;
+            animation: pulse 1s infinite;
+        }
+
+        .status-dot.connected {
+            background: #4ade80;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.recording {
+            background: #ef4444;
+            animation: pulse 0.5s infinite;
+        }
+
+        .status-dot.error {
+            background: #ef4444;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* チャットエリア */
+        .chat-area {
+            flex: 1;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            overflow-y: auto;
+            max-height: 400px;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message.user {
+            align-items: flex-end;
+        }
+
+        .message.ai {
+            align-items: flex-start;
+        }
+
+        .message-label {
+            font-size: 0.75rem;
+            color: #888;
+            margin-bottom: 4px;
+        }
+
+        .message-bubble {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 16px;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+
+        .message.user .message-bubble {
+            background: #4ade80;
+            color: #000;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.ai .message-bubble {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            border-bottom-left-radius: 4px;
+        }
+
+        .message.system .message-bubble {
+            background: rgba(255,193,7,0.2);
+            color: #ffc107;
+            font-size: 0.85rem;
+            text-align: center;
+            max-width: 100%;
+        }
+
+        .empty-chat {
+            text-align: center;
+            color: #666;
+            padding: 40px;
+        }
+
+        /* 録音ボタン */
+        .record-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .record-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 4px solid #4ade80;
+            background: transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .record-btn:disabled {
+            border-color: #666;
+            cursor: not-allowed;
+        }
+
+        .record-btn::before {
+            content: '';
+            width: 40px;
+            height: 40px;
+            background: #4ade80;
+            border-radius: 50%;
+            transition: all 0.2s;
+        }
+
+        .record-btn:disabled::before {
+            background: #666;
+        }
+
+        .record-btn.recording {
+            border-color: #ef4444;
+            animation: pulse-ring 1s infinite;
+        }
+
+        .record-btn.recording::before {
+            background: #ef4444;
+            border-radius: 8px;
+            width: 30px;
+            height: 30px;
+        }
+
+        @keyframes pulse-ring {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            100% { box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); }
+        }
+
+        .record-hint {
+            margin-top: 15px;
+            font-size: 0.85rem;
+            color: #888;
+        }
+
+        /* AI発話中インジケーター */
+        .speaking-indicator {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: rgba(74, 222, 128, 0.2);
+            border-radius: 20px;
+            margin-bottom: 15px;
+        }
+
+        .speaking-indicator.active {
+            display: flex;
+        }
+
+        .speaking-bars {
+            display: flex;
+            gap: 3px;
+            align-items: center;
+        }
+
+        .speaking-bars span {
+            width: 4px;
+            height: 16px;
+            background: #4ade80;
+            border-radius: 2px;
+            animation: speaking 0.5s ease-in-out infinite;
+        }
+
+        .speaking-bars span:nth-child(2) { animation-delay: 0.1s; }
+        .speaking-bars span:nth-child(3) { animation-delay: 0.2s; }
+        .speaking-bars span:nth-child(4) { animation-delay: 0.3s; }
+
+        @keyframes speaking {
+            0%, 100% { height: 8px; }
+            50% { height: 20px; }
+        }
+
+        /* フッター */
+        .footer {
+            text-align: center;
+            padding: 15px;
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        .footer a {
+            color: #4ade80;
+            text-decoration: none;
+        }
+
+        /* 再接続ボタン */
+        .reconnect-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            background: #4ade80;
+            color: #000;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .reconnect-btn:hover {
+            background: #22c55e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>AI Necklace</h1>
+            <p>Gemini Live API Web Demo</p>
+        </div>
+
+        <div class="status" id="statusSection">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">接続準備中...</span>
+        </div>
+
+        <div class="chat-area" id="chatArea">
+            <div class="empty-chat">接続後、マイクボタンを押しながら話しかけてください</div>
+        </div>
+
+        <div class="speaking-indicator" id="speakingIndicator">
+            <div class="speaking-bars">
+                <span></span><span></span><span></span><span></span>
+            </div>
+            <span>AIが話しています...</span>
+        </div>
+
+        <div class="record-section">
+            <button class="record-btn" id="recordBtn" disabled></button>
+            <div class="record-hint">押しながら話す</div>
+        </div>
+
+        <div class="footer">
+            <a href="https://github.com/hotaka0908/raspi-voice4" target="_blank">GitHub</a>
+             |
+            <a href="index.html">Voice Messenger</a>
+        </div>
+    </div>
+
+    <script src="api-config.js"></script>
+    <script>
+        // DOM要素
+        const statusSection = document.getElementById('statusSection');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const chatArea = document.getElementById('chatArea');
+        const recordBtn = document.getElementById('recordBtn');
+        const speakingIndicator = document.getElementById('speakingIndicator');
+
+        // 状態
+        let websocket = null;
+        let isConnected = false;
+        let isRecording = false;
+        let audioContext = null;
+        let mediaStream = null;
+
+        // ページ読み込み時に自動接続
+        window.addEventListener('load', async () => {
+            console.log('Page loaded, checking API config...');
+            console.log('API_CONFIG:', typeof API_CONFIG !== 'undefined' ? 'defined' : 'undefined');
+
+            // APIキーチェック
+            if (typeof API_CONFIG === 'undefined' || !API_CONFIG.GEMINI_API_KEY || API_CONFIG.GEMINI_API_KEY === 'YOUR_API_KEY_HERE') {
+                updateStatus('error', 'APIキーが設定されていません');
+                addMessage('system', 'api-config.js にGemini APIキーを設定してください');
+                return;
+            }
+
+            console.log('API key found, connecting...');
+            await connect(API_CONFIG.GEMINI_API_KEY);
+        });
+
+        // 接続
+        async function connect(apiKey) {
+            try {
+                updateStatus('connecting', '接続中...');
+
+                // AudioContext初期化
+                audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                    sampleRate: 24000
+                });
+
+                // マイクアクセス
+                mediaStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        sampleRate: 16000,
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true
+                    }
+                });
+
+                // WebSocket接続
+                const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`;
+                websocket = new WebSocket(wsUrl);
+
+                websocket.onopen = () => {
+                    console.log('WebSocket connected, sending setup...');
+                    sendSetup();
+                };
+
+                websocket.onmessage = (event) => {
+                    console.log('WebSocket message received:', event.data.substring ? event.data.substring(0, 200) : event.data);
+                    handleMessage(event.data);
+                };
+
+                websocket.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    updateStatus('error', '接続エラー');
+                    addReconnectButton();
+                };
+
+                websocket.onclose = (event) => {
+                    console.log('WebSocket closed:', event.code, event.reason);
+                    if (isConnected) {
+                        disconnect();
+                        addMessage('system', '接続が切断されました');
+                        addReconnectButton();
+                    } else {
+                        updateStatus('error', '接続に失敗しました');
+                        addReconnectButton();
+                    }
+                };
+
+            } catch (error) {
+                console.error('Connection error:', error);
+                updateStatus('error', '接続失敗: ' + error.message);
+                addReconnectButton();
+            }
+        }
+
+        // 再接続ボタン追加
+        function addReconnectButton() {
+            if (document.getElementById('reconnectBtn')) return;
+
+            const btn = document.createElement('button');
+            btn.id = 'reconnectBtn';
+            btn.className = 'reconnect-btn';
+            btn.textContent = '再接続';
+            btn.onclick = () => {
+                btn.remove();
+                connect(API_CONFIG.GEMINI_API_KEY);
+            };
+            statusSection.appendChild(btn);
+        }
+
+        // セットアップメッセージ送信
+        function sendSetup() {
+            const setup = {
+                setup: {
+                    model: "models/gemini-2.5-flash-native-audio-preview-12-2025",
+                    generationConfig: {
+                        responseModalities: ["AUDIO"],
+                        speechConfig: {
+                            voiceConfig: {
+                                prebuiltVoiceConfig: {
+                                    voiceName: "Kore"
+                                }
+                            }
+                        }
+                    },
+                    realtimeInputConfig: {
+                        automaticActivityDetection: {
+                            disabled: true
+                        }
+                    },
+                    systemInstruction: {
+                        parts: [{
+                            text: "あなたは親切なAIアシスタントです。日本語で簡潔に回答してください。音声での会話なので、1-2文程度の短い応答を心がけてください。"
+                        }]
+                    }
+                }
+            };
+            websocket.send(JSON.stringify(setup));
+            console.log('Setup sent:', setup);
+        }
+
+        // メッセージ処理
+        async function handleMessage(data) {
+            try {
+                let jsonData;
+
+                // Blobの場合はテキストに変換
+                if (data instanceof Blob) {
+                    const text = await data.text();
+                    console.log('Blob converted to text:', text.substring(0, 200));
+                    jsonData = text;
+                } else {
+                    jsonData = data;
+                }
+
+                if (typeof jsonData === 'string') {
+                    const msg = JSON.parse(jsonData);
+
+                    if (msg.setupComplete) {
+                        console.log('Setup complete');
+                        isConnected = true;
+                        updateStatus('connected', '接続済み - 話しかけてください');
+                        recordBtn.disabled = false;
+
+                        // 空のチャットメッセージを更新
+                        const emptyChat = chatArea.querySelector('.empty-chat');
+                        if (emptyChat) {
+                            emptyChat.textContent = 'マイクボタンを押しながら話しかけてください';
+                        }
+                        return;
+                    }
+
+                    if (msg.serverContent) {
+                        const content = msg.serverContent;
+
+                        if (content.modelTurn && content.modelTurn.parts) {
+                            for (const part of content.modelTurn.parts) {
+                                if (part.inlineData && part.inlineData.mimeType.startsWith('audio/')) {
+                                    // 音声データをキューに追加
+                                    const audioData = base64ToArrayBuffer(part.inlineData.data);
+                                    queueAudio(audioData);
+                                    speakingIndicator.classList.add('active');
+                                }
+                                if (part.text) {
+                                    // 内部思考テキストは非表示（**で始まるものなど）
+                                    if (!part.text.startsWith('**') && !part.text.includes('Responding')) {
+                                        addMessage('ai', part.text);
+                                    }
+                                }
+                            }
+                        }
+
+                        if (content.turnComplete) {
+                            speakingIndicator.classList.remove('active');
+                        }
+
+                        if (content.generationComplete) {
+                            console.log('Generation complete');
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Message handling error:', error);
+            }
+        }
+
+        // 切断
+        function disconnect() {
+            if (websocket) {
+                websocket.close();
+                websocket = null;
+            }
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+            }
+            isConnected = false;
+            isRecording = false;
+            updateStatus('disconnected', '未接続');
+            recordBtn.disabled = true;
+            recordBtn.classList.remove('recording');
+            speakingIndicator.classList.remove('active');
+        }
+
+        // 録音ボタン
+        recordBtn.addEventListener('mousedown', startRecording);
+        recordBtn.addEventListener('mouseup', stopRecording);
+        recordBtn.addEventListener('mouseleave', stopRecording);
+        recordBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            startRecording();
+        });
+        recordBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            stopRecording();
+        });
+
+        // 録音開始
+        async function startRecording() {
+            if (!isConnected || isRecording) return;
+
+            isRecording = true;
+            recordBtn.classList.add('recording');
+            statusDot.classList.add('recording');
+            statusDot.classList.remove('connected');
+            statusText.textContent = '録音中...';
+
+            // AudioContextがサスペンド状態なら再開
+            if (audioContext.state === 'suspended') {
+                await audioContext.resume();
+                console.log('AudioContext resumed');
+            }
+
+            // 音声活動開始を通知
+            sendActivityStart();
+            audioChunkCount = 0;
+
+            // 録音用の新しいAudioContextを作成（ネイティブサンプルレートを使用）
+            const recordingContext = new (window.AudioContext || window.webkitAudioContext)();
+            console.log('Recording context sample rate:', recordingContext.sampleRate);
+
+            // 音声処理
+            const source = recordingContext.createMediaStreamSource(mediaStream);
+            const processor = recordingContext.createScriptProcessor(4096, 1, 1);
+
+            processor.onaudioprocess = (e) => {
+                if (!isRecording) return;
+
+                const inputData = e.inputBuffer.getChannelData(0);
+
+                // 16kHzにリサンプリング
+                const ratio = recordingContext.sampleRate / 16000;
+                const outputLength = Math.floor(inputData.length / ratio);
+                const outputData = new Int16Array(outputLength);
+
+                for (let i = 0; i < outputLength; i++) {
+                    const index = Math.floor(i * ratio);
+                    outputData[i] = Math.max(-32768, Math.min(32767, inputData[index] * 32768));
+                }
+
+                // Base64エンコードして送信
+                const base64Audio = arrayBufferToBase64(outputData.buffer);
+                sendAudio(base64Audio);
+            };
+
+            source.connect(processor);
+            processor.connect(recordingContext.destination);
+
+            // 後で切断するために保存
+            recordBtn._processor = processor;
+            recordBtn._source = source;
+            recordBtn._recordingContext = recordingContext;
+        }
+
+        // 録音停止
+        function stopRecording() {
+            if (!isRecording) return;
+
+            isRecording = false;
+            recordBtn.classList.remove('recording');
+            statusDot.classList.remove('recording');
+            statusDot.classList.add('connected');
+            statusText.textContent = '接続済み';
+
+            // 音声処理を切断
+            if (recordBtn._processor) {
+                recordBtn._processor.disconnect();
+                recordBtn._processor = null;
+            }
+            if (recordBtn._source) {
+                recordBtn._source.disconnect();
+                recordBtn._source = null;
+            }
+            if (recordBtn._recordingContext) {
+                recordBtn._recordingContext.close();
+                recordBtn._recordingContext = null;
+            }
+
+            // 音声活動終了を通知
+            console.log(`Recording stopped. Total chunks sent: ${audioChunkCount}`);
+            sendActivityEnd();
+
+            if (audioChunkCount > 0) {
+                addMessage('user', '(音声入力)');
+            } else {
+                addMessage('system', '音声が検出されませんでした。もう一度お試しください。');
+            }
+        }
+
+        // 音声データ送信
+        let audioChunkCount = 0;
+        function sendAudio(base64Audio) {
+            if (!websocket || websocket.readyState !== WebSocket.OPEN) return;
+
+            audioChunkCount++;
+            if (audioChunkCount === 1 || audioChunkCount % 10 === 0) {
+                console.log(`Audio chunk #${audioChunkCount} sent, size: ${base64Audio.length} chars`);
+            }
+
+            const msg = {
+                realtimeInput: {
+                    audio: {
+                        mimeType: "audio/pcm;rate=16000",
+                        data: base64Audio
+                    }
+                }
+            };
+            websocket.send(JSON.stringify(msg));
+        }
+
+        // 音声活動開始を通知
+        function sendActivityStart() {
+            if (!websocket || websocket.readyState !== WebSocket.OPEN) return;
+
+            const msg = {
+                realtimeInput: {
+                    activityStart: {}
+                }
+            };
+            websocket.send(JSON.stringify(msg));
+            console.log('Activity start sent');
+        }
+
+        // 音声活動終了を通知
+        function sendActivityEnd() {
+            if (!websocket || websocket.readyState !== WebSocket.OPEN) return;
+
+            const msg = {
+                realtimeInput: {
+                    activityEnd: {}
+                }
+            };
+            websocket.send(JSON.stringify(msg));
+            console.log('Activity end sent');
+        }
+
+        // 音声再生キュー
+        const audioQueue = [];
+        let isPlayingAudio = false;
+        let playbackContext = null;
+
+        // 音声をキューに追加
+        function queueAudio(pcmData) {
+            audioQueue.push(pcmData);
+            console.log(`Audio queued, queue length: ${audioQueue.length}`);
+            if (!isPlayingAudio) {
+                playNextAudio();
+            }
+        }
+
+        // 次の音声を再生
+        async function playNextAudio() {
+            if (audioQueue.length === 0) {
+                isPlayingAudio = false;
+                return;
+            }
+
+            isPlayingAudio = true;
+            const pcmData = audioQueue.shift();
+
+            try {
+                // 再生用AudioContextを作成（まだない場合）
+                if (!playbackContext || playbackContext.state === 'closed') {
+                    playbackContext = new (window.AudioContext || window.webkitAudioContext)({
+                        sampleRate: 24000
+                    });
+                }
+
+                // サスペンド状態なら再開
+                if (playbackContext.state === 'suspended') {
+                    await playbackContext.resume();
+                }
+
+                // PCM 16bit → Float32
+                const int16Array = new Int16Array(pcmData);
+                const float32Array = new Float32Array(int16Array.length);
+                for (let i = 0; i < int16Array.length; i++) {
+                    float32Array[i] = int16Array[i] / 32768;
+                }
+
+                // AudioBuffer作成
+                const audioBuffer = playbackContext.createBuffer(1, float32Array.length, 24000);
+                audioBuffer.getChannelData(0).set(float32Array);
+
+                // 再生
+                const source = playbackContext.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(playbackContext.destination);
+
+                source.onended = () => {
+                    playNextAudio();
+                };
+
+                source.start();
+                console.log(`Playing audio chunk, duration: ${audioBuffer.duration.toFixed(2)}s`);
+            } catch (error) {
+                console.error('Audio playback error:', error);
+                playNextAudio(); // エラーでも次を再生
+            }
+        }
+
+        // ユーティリティ関数
+        function base64ToArrayBuffer(base64) {
+            const binaryString = atob(base64);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        function arrayBufferToBase64(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.byteLength; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return btoa(binary);
+        }
+
+        function updateStatus(status, text) {
+            statusText.textContent = text;
+            statusDot.className = 'status-dot';
+            if (status === 'connecting') {
+                statusDot.classList.add('connecting');
+            } else if (status === 'connected') {
+                statusDot.classList.add('connected');
+            } else if (status === 'recording') {
+                statusDot.classList.add('recording');
+            } else if (status === 'error') {
+                statusDot.classList.add('error');
+            }
+        }
+
+        function addMessage(type, text) {
+            // 空のチャットメッセージを削除
+            const emptyChat = chatArea.querySelector('.empty-chat');
+            if (emptyChat) {
+                emptyChat.remove();
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+
+            const label = document.createElement('div');
+            label.className = 'message-label';
+            label.textContent = type === 'user' ? 'あなた' : type === 'ai' ? 'AI' : 'システム';
+
+            const bubble = document.createElement('div');
+            bubble.className = 'message-bubble';
+            bubble.textContent = text;
+
+            messageDiv.appendChild(label);
+            messageDiv.appendChild(bubble);
+            chatArea.appendChild(messageDiv);
+
+            // スクロール
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+    </script>
+</body>
+</html>

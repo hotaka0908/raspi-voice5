@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# Claude
+.claude/
+
+# Node.js
+node_modules/
+functions/node_modules/
+
+# Credentials
+credentials.json
+token.json
+*.json.bak
+
+# Config files with secrets
+docs/firebase-config.js
+docs/api-config.js
+docs/.firebase/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
