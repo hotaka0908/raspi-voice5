@@ -1,4 +1,7 @@
-# Gemini Live API
+# OpenAI Realtime API
+websockets>=11.0
+
+# Gemini API (Vision API for camera_capture)
 google-genai>=0.4.0
 
 # Audio handling
