@@ -679,9 +679,9 @@ def gmail_send_photo_func(to, subject, body):
                 tmp_path = tmp.name
 
             result = subprocess.run(
-                ['libcamera-still', '-o', tmp_path, '-t', '1000', '--nopreview', '-n'],
+                ['rpicam-still', '-o', tmp_path, '-t', '1000', '--nopreview', '-n'],
                 capture_output=True,
-                timeout=10
+                timeout=15
             )
 
             if result.returncode != 0:
@@ -869,9 +869,9 @@ def camera_capture_func(prompt="この画像に何が写っていますか？"):
                 tmp_path = tmp.name
 
             result = subprocess.run(
-                ['libcamera-still', '-o', tmp_path, '-t', '1000', '--nopreview', '-n'],
+                ['rpicam-still', '-o', tmp_path, '-t', '1000', '--nopreview', '-n'],
                 capture_output=True,
-                timeout=10
+                timeout=15
             )
 
             if result.returncode != 0:
@@ -1039,9 +1039,9 @@ def voice_send_photo_func():
                 tmp_path = tmp.name
 
             result = subprocess.run(
-                ['libcamera-still', '-o', tmp_path, '-t', '1000', '--nopreview', '-n'],
+                ['rpicam-still', '-o', tmp_path, '-t', '1000', '--nopreview', '-n'],
                 capture_output=True,
-                timeout=10
+                timeout=15
             )
 
             if result.returncode != 0:
