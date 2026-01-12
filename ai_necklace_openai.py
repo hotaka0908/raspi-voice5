@@ -9,7 +9,7 @@ Gmail、アラーム、カメラ、音声メッセージ機能を統合。
 - リアルタイム音声対話（低レイテンシ）
 - Gmail連携（メール確認・返信・送信）
 - アラーム機能（時刻指定で音声通知）
-- カメラ機能（Gemini Visionで画像認識）
+- カメラ機能（OpenAI GPT-4oで画像認識）
 - 写真付きメール送信
 - 音声メッセージ（Firebase経由でスマホとやり取り）
 """
@@ -44,9 +44,7 @@ except ImportError:
     ALSA_AVAILABLE = False
     print("警告: alsaaudioが見つかりません。PyAudioで出力します。")
 
-# Gemini Vision API (camera_capture用)
-from google import genai
-from google.genai import types
+import requests
 from dotenv import load_dotenv
 
 # Gmail API
@@ -864,7 +862,7 @@ def start_alarm_thread():
 # ==================== カメラ機能 ====================
 
 def camera_capture_func(prompt="この画像に何が写っていますか？"):
-    """カメラで撮影してGemini Vision APIで分析"""
+    """カメラで撮影してOpenAI Vision API (GPT-4o)で分析"""
     with camera_lock:
         try:
             with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
@@ -884,25 +882,51 @@ def camera_capture_func(prompt="この画像に何が写っていますか？"):
 
             os.unlink(tmp_path)
 
-            # Gemini Vision APIで分析
-            api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+            # OpenAI Vision APIで分析
+            api_key = os.getenv("OPENAI_API_KEY")
             if not api_key:
-                return "Gemini APIキーが設定されていません"
+                return "OpenAI APIキーが設定されていません"
 
-            client = genai.Client(api_key=api_key)
+            # Base64エンコード
+            image_base64 = base64.b64encode(image_data).decode('utf-8')
 
-            response = client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=[
-                    types.Part.from_bytes(
-                        data=image_data,
-                        mime_type="image/jpeg"
-                    ),
-                    prompt
-                ]
+            # OpenAI Chat Completions API (Vision)
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}"
+            }
+
+            payload = {
+                "model": "gpt-4o",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{image_base64}"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "max_tokens": 1000
+            }
+
+            response = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=30
             )
 
-            return response.text
+            if response.status_code == 200:
+                result_data = response.json()
+                return result_data["choices"][0]["message"]["content"]
+            else:
+                return f"Vision APIエラー: {response.status_code} - {response.text}"
 
         except subprocess.TimeoutExpired:
             return "カメラタイムアウト"
